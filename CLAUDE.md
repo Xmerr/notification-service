@@ -8,7 +8,7 @@ Elixir notification service that consumes messages from the `notifications` Rabb
 
 ## Tech Stack
 
-- **Runtime**: Elixir 1.17+ / OTP 26+ (Docker uses 1.18/OTP 27)
+- **Runtime**: Elixir 1.17 / OTP 26 (amqp library incompatible with OTP 27)
 - **Message Consumer**: Broadway + broadway_rabbitmq
 - **AMQP Setup**: amqp library
 - **HTTP Client**: Req
