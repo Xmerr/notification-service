@@ -2,6 +2,11 @@
 
 Elixir-based RabbitMQ consumer that routes messages from the `notifications` exchange to Discord channels via webhooks. Built with Broadway for concurrent message processing.
 
+## Links
+
+- [GitHub](https://github.com/Xmerr/notification-service)
+- [Docker Hub](https://hub.docker.com/r/xmer/notification-service)
+
 ## Features
 
 - **Concurrent Processing**: Broadway-based pipeline with configurable concurrency
@@ -12,7 +17,7 @@ Elixir-based RabbitMQ consumer that routes messages from the `notifications` exc
 
 ## Prerequisites
 
-- Elixir 1.17+ / OTP 26+
+- Elixir 1.17+ / OTP 25+
 - RabbitMQ 3.12+ with [Delayed Message Exchange plugin](https://github.com/rabbitmq/rabbitmq-delayed-message-exchange)
 - Docker (for containerized deployment)
 
