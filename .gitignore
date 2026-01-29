@@ -1,0 +1,30 @@
+# Dependencies
+/deps/
+
+# Build
+/_build/
+
+# Coverage
+/cover/
+
+# Generated files
+*.beam
+*.ez
+
+# Environment
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.elixir_ls/
+.vscode/
+.idea/
+
+# Release
+/rel/
+
+# Dialyzer
+/priv/plts/

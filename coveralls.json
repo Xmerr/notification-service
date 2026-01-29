@@ -1,0 +1,12 @@
+{
+  "coverage_options": {
+    "treat_no_relevant_lines_as_covered": true,
+    "minimum_coverage": 93
+  },
+  "skip_files": [
+    "lib/notification_service/rabbitmq/setup.ex",
+    "lib/notification_service/rabbitmq/amqp.ex",
+    "lib/notification_service/application.ex",
+    "lib/notification_service.ex"
+  ]
+}
