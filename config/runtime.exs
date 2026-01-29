@@ -56,13 +56,13 @@ if config_env() != :test do
   if loki_host = System.get_env("LOKI_HOST") do
     config :notification_service, loki_host: loki_host
 
-    config :keen_loki_logger,
-      endpoint: "#{loki_host}/loki/api/v1/push",
-      labels: %{job: "notification-service", environment: to_string(config_env())},
+    config :logger, :keen_loki_logger,
+      loki_host: loki_host,
+      loki_labels: %{job: "notification-service", environment: to_string(config_env())},
       level: :info
 
     config :logger,
-      backends: [:console, KeenLokiLogger]
+      backends: [:console, LokiLogger]
   end
 
   # Optional: Log level override
