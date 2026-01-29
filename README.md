@@ -1,6 +1,6 @@
 # Notification Service
 
-Elixir-based RabbitMQ consumer that routes messages from the `notifications` exchange to Discord channels via webhooks. Built with Broadway for concurrent message processing.
+RabbitMQ consumer that routes messages from the `notifications` exchange to Discord channels via webhooks. Built with Bun and TypeScript.
 
 ## Links
 
@@ -9,7 +9,6 @@ Elixir-based RabbitMQ consumer that routes messages from the `notifications` exc
 
 ## Features
 
-- **Concurrent Processing**: Broadway-based pipeline with configurable concurrency
 - **Flexible Routing**: Map routing key prefixes to different Discord webhooks
 - **Error Routing**: Automatically send critical events (failures, DLQ alerts) to a dedicated errors channel
 - **Retry with Backoff**: Exponential backoff via RabbitMQ Delayed Message Exchange plugin
@@ -17,7 +16,7 @@ Elixir-based RabbitMQ consumer that routes messages from the `notifications` exc
 
 ## Prerequisites
 
-- Elixir 1.17+ / OTP 25+
+- Bun 1.x
 - RabbitMQ 3.12+ with [Delayed Message Exchange plugin](https://github.com/rabbitmq/rabbitmq-delayed-message-exchange)
 - Docker (for containerized deployment)
 
@@ -27,13 +26,13 @@ Elixir-based RabbitMQ consumer that routes messages from the `notifications` exc
 
 ```bash
 # Install dependencies
-mix deps.get
+bun install
 
 # Run tests
-mix test
+bun test
 
 # Start the application
-iex -S mix
+bun run start
 ```
 
 ### Docker
@@ -112,7 +111,7 @@ Map routing key prefixes to webhook names using `DISCORD_ROUTE_<CATEGORY>`:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LOKI_HOST` | (none) | Grafana Loki endpoint for centralized logging |
-| `LOG_LEVEL` | `info` | Logger level: `debug`, `info`, `warning`, `error` |
+| `LOG_LEVEL` | `info` | Logger level: `debug`, `info`, `warn`, `error` |
 
 ## Message Types
 
@@ -136,7 +135,7 @@ The service formats different message types into Discord embeds:
 
 ```
 RabbitMQ (notifications queue)
-  → NotificationConsumer (Broadway)
+  → NotificationConsumer
     → NotificationService (orchestrator)
       → Router (routing key → webhook URLs)
       → Formatter (payload → Discord embed)
@@ -153,19 +152,19 @@ RabbitMQ (notifications queue)
 
 ```bash
 # Run tests
-mix test
+bun test
 
 # Run tests with coverage
-mix coveralls
+bun run test:coverage
+
+# Lint code
+bun run lint
 
 # Format code
-mix format
+bun run format
 
-# Check formatting
-mix format --check-formatted
-
-# Type checking (optional)
-mix dialyzer
+# Type checking
+bun run typecheck
 ```
 
 ## License
