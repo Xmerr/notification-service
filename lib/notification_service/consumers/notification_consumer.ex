@@ -24,7 +24,7 @@ defmodule NotificationService.Consumers.NotificationConsumer do
         module:
           {BroadwayRabbitMQ.Producer,
            queue: Config.queue_name(),
-           connection: [uri: Config.rabbitmq_url()],
+           connection: Config.rabbitmq_url(),
            qos: [prefetch_count: Keyword.get(opts, :prefetch_count, 10)],
            on_failure: :ack},
         concurrency: 1
