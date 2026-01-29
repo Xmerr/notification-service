@@ -3,10 +3,6 @@ name: Build and Deploy
 on:
   push:
     branches: [main]
-  workflow_dispatch:
-
-env:
-  DOCKER_IMAGE: xmer/notification-service
 
 jobs:
   build-test-deploy:
@@ -15,36 +11,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Elixir
-        uses: erlef/setup-beam@v1
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          elixir-version: '1.17'
-          otp-version: '25'
-
-      - name: Cache deps
-        uses: actions/cache@v4
-        with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
-          restore-keys: ${{ runner.os }}-mix-
+          bun-version: latest
 
       - name: Install dependencies
-        run: mix deps.get
+        run: bun install --frozen-lockfile
 
-      - name: Check formatting
-        run: mix format --check-formatted
+      - name: Run linting
+        run: bun run lint
 
       - name: Run tests with coverage
-        run: mix coveralls.json
-        env:
-          MIX_ENV: test
+        run: bun run test:coverage
 
-      - name: Build release
-        run: mix release
-        env:
-          MIX_ENV: prod
+      - name: Build
+        run: bun run build
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -59,7 +41,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.DOCKER_IMAGE }}
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/notification-service
           tags: |
             type=sha,prefix=
             type=raw,value=latest
@@ -74,12 +56,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Update Docker Hub description
-        uses: peter-evans/dockerhub-description@v5
+      - name: Update Docker Hub README
+        uses: peter-evans/dockerhub-description@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ env.DOCKER_IMAGE }}
+          repository: ${{ secrets.DOCKERHUB_USERNAME }}/notification-service
+          readme-filepath: ./README.md
 
   notify-result:
     runs-on: ubuntu-latest

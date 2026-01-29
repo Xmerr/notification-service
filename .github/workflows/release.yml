@@ -6,7 +6,7 @@ on:
       - 'v*.*.*'
 
 env:
-  DOCKER_IMAGE: xmer/notification-service
+  DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/notification-service
 
 jobs:
   test:
@@ -16,28 +16,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Elixir
-        uses: erlef/setup-beam@v1
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          elixir-version: '1.17'
-          otp-version: '25'
-
-      - name: Cache deps
-        uses: actions/cache@v4
-        with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
-          restore-keys: ${{ runner.os }}-mix-
+          bun-version: latest
 
       - name: Install dependencies
-        run: mix deps.get
+        run: bun install --frozen-lockfile
 
       - name: Run tests with coverage
-        run: mix coveralls.json
-        env:
-          MIX_ENV: test
+        run: bun run test:coverage
 
   build-and-push:
     name: Build and Push Docker Image
@@ -93,6 +81,7 @@ jobs:
       - name: Generate release notes
         id: notes
         run: |
+          # Get commits since last tag
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           if [ -n "$PREVIOUS_TAG" ]; then
             COMMITS=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD)
@@ -100,6 +89,7 @@ jobs:
             COMMITS=$(git log --pretty=format:"- %s (%h)")
           fi
 
+          # Write release notes
           cat << EOF > release-notes.md
           ## Docker Image
 
