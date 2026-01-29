@@ -73,43 +73,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Elixir
-        uses: erlef/setup-beam@v1
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          elixir-version: '1.17'
-          otp-version: '25'
-
-      - name: Cache deps
-        uses: actions/cache@v4
-        with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
-          restore-keys: ${{ runner.os }}-mix-
+          bun-version: latest
 
       - name: Install dependencies
-        run: mix deps.get
+        run: bun install --frozen-lockfile
 
-      - name: Check formatting
-        run: mix format --check-formatted
+      - name: Run linting
+        run: bun run lint
 
       - name: Run tests with coverage
-        run: mix coveralls.json
-        env:
-          MIX_ENV: test
+        run: bun run test:coverage
 
       - name: Build
-        run: mix compile --warnings-as-errors
-        env:
-          MIX_ENV: prod
+        run: bun run build
 
       - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: ./cover/
+          path: ./coverage/
           retention-days: 30
 
   notify-result:

@@ -1,30 +1,31 @@
 # Dependencies
-/deps/
+node_modules/
 
-# Build
-/_build/
-
-# Coverage
-/cover/
-
-# Generated files
-*.beam
-*.ez
+# Build output
+dist/
 
 # Environment
 .env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
 
-# IDE
-.elixir_ls/
-.vscode/
-.idea/
+# Test
+coverage/
 
-# Release
-/rel/
+# Logs
+*.log
+logs/
 
-# Dialyzer
-/priv/plts/
+# Bun
+bun.lockb

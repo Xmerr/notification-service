@@ -4,59 +4,68 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Overview
 
-Elixir notification service that consumes messages from the `notifications` RabbitMQ exchange and routes them to Discord channels via webhooks. Built with Broadway for concurrent message processing.
+Bun-based RabbitMQ consumer that routes messages from the `notifications` exchange to Discord channels via webhooks.
 
 ## Tech Stack
 
-- **Runtime**: Elixir 1.17 / OTP 25 (amqp library incompatible with OTP 27)
-- **Message Consumer**: Broadway + broadway_rabbitmq
-- **AMQP Setup**: amqp library
-- **HTTP Client**: Req
-- **JSON**: Jason
-- **Logging**: Elixir Logger + keen_loki_logger (Grafana Loki)
-- **Test Mocking**: Mox
-- **HTTP Testing**: Bypass + Plug
-- **Coverage**: ExCoveralls
+- **Runtime**: Bun
+- **Language**: TypeScript (strict mode)
+- **Message Broker**: RabbitMQ (amqplib)
+- **HTTP Client**: Native fetch
+- **Logging**: Pino + pino-loki (Grafana Loki)
+- **Linting/Formatting**: Biome
+- **Testing**: Bun test runner
 
 ## Commands
 
 | Task | Command |
 |------|---------|
-| Install dependencies | `mix deps.get` |
-| Compile | `mix compile` |
-| Run tests | `mix test` |
-| Run tests with coverage | `mix coveralls` |
-| Format code | `mix format` |
-| Check formatting | `mix format --check-formatted` |
-| Type checking | `mix dialyzer` |
-| Start application | `iex -S mix` or `mix run --no-halt` |
-| Build release | `mix release` |
+| Install dependencies | `bun install` |
+| Start application | `bun run start` |
+| Start with watch | `bun run dev` |
+| Build | `bun run build` |
+| Run tests | `bun test` |
+| Run tests with coverage | `bun run test:coverage` |
+| Lint | `bun run lint` |
+| Lint and fix | `bun run lint:fix` |
+| Format | `bun run format` |
+| Type check | `bun run typecheck` |
 
 ## Architecture
 
-Layer-based structure following the global CLAUDE.md conventions, adapted for Elixir:
+Layer-based structure following the global CLAUDE.md conventions:
 
 ```
-lib/notification_service/
-├── consumers/          # Broadway message handlers (one per queue)
-├── services/           # Business logic (1:1 with consumers)
-├── publishers/         # Shared publishing utilities
-├── discord/            # Discord-specific modules (client, router, formatter)
-├── rabbitmq/           # RabbitMQ setup and AMQP wrapper
-├── config.ex           # Runtime config access
-├── errors.ex           # Custom error types
-└── application.ex      # OTP supervision tree
+src/
+├── index.ts              # Entry point — bootstrap and start consumers
+├── config/
+│   ├── index.ts          # Environment variables and configuration
+│   └── rabbitmq.ts       # RabbitMQ connection and channel setup
+├── consumers/
+│   └── notifications.consumer.ts  # Queue subscription handler
+├── services/
+│   └── notifications.service.ts   # Business logic — orchestrator
+├── publishers/
+│   └── notifications.publisher.ts # Retry and DLQ publishing
+├── discord/
+│   ├── client.ts         # HTTP client for Discord webhooks
+│   ├── router.ts         # Routing key → webhook URL mapping
+│   └── formatter.ts      # Payload → Discord embed formatting
+├── errors/
+│   └── index.ts          # Custom error classes
+└── types/
+    └── index.ts          # TypeScript interfaces
 ```
 
 ## Message Flow
 
 ```
 RabbitMQ (notifications queue)
-  → NotificationConsumer (Broadway)
-    → NotificationService (orchestrator)
-      → Router (routing key → webhook URLs)
-      → Formatter (payload → Discord embed)
-      → Client (HTTP POST to Discord)
+  → notifications.consumer.ts (validate, ack/nack, delegate)
+    → notifications.service.ts (orchestrator)
+      → router.ts (routing key → webhook URLs)
+      → formatter.ts (payload → Discord embed)
+      → client.ts (HTTP POST to Discord)
 ```
 
 ## Error Handling
@@ -70,31 +79,6 @@ Uses RabbitMQ Delayed Message Exchange plugin:
 - Max 20 retries with exponential backoff (instant, 1s, 2s, 4s... cap 16h)
 - After exhaustion, messages go to `notifications.dlq` queue
 - DLQ alerts published to `notifications.dlq.notification-service` routing key
-
-## Testing
-
-All modules use behaviours for testability. Mox mocks are defined in `test/support/mocks.ex`:
-- `MockClient` — Discord HTTP client
-- `MockRouter` — Routing key mapping
-- `MockFormatter` — Embed formatting
-- `MockNotificationService` — Service orchestrator
-- `MockAMQP` — AMQP operations (injectable wrapper for testability)
-
-Test config (`config/test.exs`) disables Broadway and RabbitMQ setup for unit tests.
-
-**HTTP Testing**: Use Bypass for Discord client tests. Example:
-```elixir
-bypass = Bypass.open()
-Bypass.expect_once(bypass, "POST", "/webhooks/test/token", fn conn ->
-  Plug.Conn.send_resp(conn, 200, "")
-end)
-Client.send_embed("http://localhost:#{bypass.port}/webhooks/test/token", embed)
-```
-
-**AMQP Testing**: The `NotificationService.RabbitMQ.AMQPBehaviour` wrapper enables mocking AMQP operations without a real RabbitMQ connection. Configure in tests via:
-```elixir
-Application.put_env(:notification_service, :amqp_module, NotificationService.RabbitMQ.MockAMQP)
-```
 
 ## Environment Variables
 
@@ -115,19 +99,13 @@ Optional:
 
 ## Quality Gates
 
-- **Coverage**: 93% minimum (enforced by ExCoveralls via `coveralls.json`)
-- **Formatting**: `mix format --check-formatted` must pass
-- **Type checking**: `mix dialyzer` (optional but recommended)
-
-**Coverage Exclusions** (in `coveralls.json`):
-- `lib/notification_service/rabbitmq/setup.ex` — requires real RabbitMQ
-- `lib/notification_service/rabbitmq/amqp.ex` — thin wrapper, tested via mocks
-- `lib/notification_service/application.ex` — OTP supervisor code
-- `lib/notification_service.ex` — root module with no logic
+- **Coverage**: 95% minimum
+- **Linting**: `bun run lint` must pass
+- **Type checking**: `bun run typecheck` must pass
 
 ## CI/CD
 
-Uses `erlef/setup-beam@v2` for Elixir/OTP setup in GitHub Actions.
+Uses `oven-sh/setup-bun@v2` for Bun setup in GitHub Actions.
 
 Workflows:
 - `ci.yml` — Build + deploy on push to main
@@ -135,13 +113,3 @@ Workflows:
 - `release.yml` — Release on version tags (v*.*.*)
 
 Docker image: `xmer/notification-service`
-
-## Implementation Notes
-
-1. **Injectable Dependencies**: All external dependencies (Discord client, AMQP) are injected via Application config, enabling Mox-based testing.
-
-2. **Behaviour Pattern**: Each mockable module defines a behaviour (e.g., `ClientBehaviour`, `AMQPBehaviour`) in the same file as the implementation.
-
-3. **Broadway Configuration**: The consumer uses `on_failure: :ack` to prevent message requeue loops — failed messages are handled by `handle_failed/2` which routes them to retry or DLQ.
-
-4. **Concurrent Webhook Delivery**: The service uses `Task.async_stream` to send to multiple webhooks concurrently (e.g., primary + errors channel).
