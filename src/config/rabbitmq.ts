@@ -10,6 +10,7 @@ const EXCHANGE = "notifications";
 const EXCHANGE_DLQ = "notifications.dlq";
 const EXCHANGE_DELAY = "notifications.delay";
 const EXCHANGE_GITHUB = "github";
+const EXCHANGE_DISCORD = "discord";
 const QUEUE = "notifications";
 const QUEUE_DLQ = "notifications.dlq";
 
@@ -26,6 +27,7 @@ export async function setupRabbitMQ(url: string, logger: Logger): Promise<Rabbit
 		arguments: { "x-delayed-type": "topic" },
 	});
 	await channel.assertExchange(EXCHANGE_GITHUB, "topic", { durable: true });
+	await channel.assertExchange(EXCHANGE_DISCORD, "topic", { durable: true });
 
 	logger.info("Asserting queues...");
 	await channel.assertQueue(QUEUE, { durable: true });
@@ -46,4 +48,4 @@ export async function setupRabbitMQ(url: string, logger: Logger): Promise<Rabbit
 	return { connection, channel };
 }
 
-export { EXCHANGE, EXCHANGE_DLQ, EXCHANGE_DELAY, QUEUE };
+export { EXCHANGE, EXCHANGE_DLQ, EXCHANGE_DELAY, EXCHANGE_DISCORD, QUEUE };

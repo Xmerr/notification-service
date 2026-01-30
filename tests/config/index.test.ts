@@ -7,7 +7,7 @@ describe("loadConfig", () => {
 	beforeEach(() => {
 		process.env = { ...originalEnv };
 		process.env["RABBITMQ_URL"] = "amqp://localhost";
-		process.env["DISCORD_WEBHOOK_DEFAULT"] = "https://discord.com/api/webhooks/default/token";
+		process.env["DISCORD_CHANNEL_DEFAULT"] = "123456789";
 	});
 
 	afterEach(() => {
@@ -23,55 +23,49 @@ describe("loadConfig", () => {
 			expect(() => loadConfig()).toThrow("RABBITMQ_URL environment variable is required");
 		});
 
-		it("should throw if DISCORD_WEBHOOK_DEFAULT is missing", () => {
+		it("should throw if DISCORD_CHANNEL_DEFAULT is missing", () => {
 			// Arrange
-			process.env["DISCORD_WEBHOOK_DEFAULT"] = undefined;
+			process.env["DISCORD_CHANNEL_DEFAULT"] = undefined;
 
 			// Act & Assert
 			expect(() => loadConfig()).toThrow(
-				"DISCORD_WEBHOOK_DEFAULT environment variable is required",
+				"DISCORD_CHANNEL_DEFAULT environment variable is required",
 			);
 		});
 	});
 
-	describe("webhook configuration", () => {
-		it("should load default webhook", () => {
+	describe("channel configuration", () => {
+		it("should load default channel", () => {
 			// Act
 			const config = loadConfig();
 
 			// Assert
-			expect(config.discord.defaultWebhook).toBe("https://discord.com/api/webhooks/default/token");
+			expect(config.discord.defaultChannel).toBe("123456789");
 		});
 
-		it("should load all DISCORD_WEBHOOK_* variables", () => {
+		it("should load all DISCORD_CHANNEL_* variables", () => {
 			// Arrange
-			process.env["DISCORD_WEBHOOK_INFO"] = "https://discord.com/api/webhooks/info/token";
-			process.env["DISCORD_WEBHOOK_ERRORS"] = "https://discord.com/api/webhooks/errors/token";
+			process.env["DISCORD_CHANNEL_INFO"] = "111111111";
+			process.env["DISCORD_CHANNEL_ERRORS"] = "222222222";
 
 			// Act
 			const config = loadConfig();
 
 			// Assert
-			expect(config.discord.webhooks["info"]).toBe("https://discord.com/api/webhooks/info/token");
-			expect(config.discord.webhooks["errors"]).toBe(
-				"https://discord.com/api/webhooks/errors/token",
-			);
-			expect(config.discord.webhooks["default"]).toBe(
-				"https://discord.com/api/webhooks/default/token",
-			);
+			expect(config.discord.channels["info"]).toBe("111111111");
+			expect(config.discord.channels["errors"]).toBe("222222222");
+			expect(config.discord.channels["default"]).toBe("123456789");
 		});
 
-		it("should convert webhook names to lowercase", () => {
+		it("should convert channel names to lowercase", () => {
 			// Arrange
-			process.env["DISCORD_WEBHOOK_MyWebhook"] = "https://discord.com/api/webhooks/my/token";
+			process.env["DISCORD_CHANNEL_MyChannel"] = "333333333";
 
 			// Act
 			const config = loadConfig();
 
 			// Assert
-			expect(config.discord.webhooks["mywebhook"]).toBe(
-				"https://discord.com/api/webhooks/my/token",
-			);
+			expect(config.discord.channels["mychannel"]).toBe("333333333");
 		});
 	});
 

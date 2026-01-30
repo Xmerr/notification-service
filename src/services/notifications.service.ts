@@ -1,26 +1,33 @@
+import type { Channel } from "amqplib";
 import type { Logger } from "pino";
 import type { Config } from "../config/index.js";
-import { sendEmbed } from "../discord/client.js";
+import { getChannelIds } from "../discord/channel-router.js";
 import { formatEmbed } from "../discord/formatter.js";
-import { getWebhookUrls } from "../discord/router.js";
-import type { NotificationMessage } from "../types/index.js";
+import { publishToDiscord } from "../publishers/discord.publisher.js";
+import type { NotificationMessage, SendPostMessage } from "../types/index.js";
 
-export async function processNotification(
+function generateCorrelationId(): string {
+	return `notification-${crypto.randomUUID()}`;
+}
+
+export function processNotification(
 	routingKey: string,
 	payload: NotificationMessage,
 	config: Config,
+	channel: Channel,
 	logger: Logger,
-): Promise<void> {
+): void {
 	const embed = formatEmbed(routingKey, payload);
-	const webhookUrls = getWebhookUrls(routingKey, config);
+	const channelIds = getChannelIds(routingKey, config);
 
-	logger.debug({ routingKey, webhookCount: webhookUrls.length }, "Processing notification");
+	logger.debug({ routingKey, channelCount: channelIds.length }, "Processing notification");
 
-	const results = await Promise.allSettled(webhookUrls.map((url) => sendEmbed(url, embed, logger)));
-
-	const failed = results.filter((r) => r.status === "rejected");
-	if (failed.length > 0) {
-		const firstError = (failed[0] as PromiseRejectedResult).reason;
-		throw firstError;
+	for (const channelId of channelIds) {
+		const message: SendPostMessage = {
+			id: generateCorrelationId(),
+			channel_id: channelId,
+			embed,
+		};
+		publishToDiscord(channel, message, logger);
 	}
 }
