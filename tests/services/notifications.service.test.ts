@@ -12,14 +12,10 @@ function createConfig(): Config {
 	return {
 		rabbitmq: { url: "amqp://localhost" },
 		discord: {
-			channels: {
-				default: "100000000000000000",
-				info: "111111111111111111",
-				errors: "222222222222222222",
-			},
-			routes: { ci: "info" },
-			errorRoutes: ["ci.failure"],
-			defaultChannel: "100000000000000000",
+			infoChannel: "info-channel-id",
+			warnChannel: "warn-channel-id",
+			errorChannel: "error-channel-id",
+			criticalChannel: "critical-channel-id",
 		},
 		loki: { host: undefined },
 		logLevel: "info",
@@ -35,7 +31,7 @@ function createMockChannel() {
 describe("processNotification", () => {
 	let channel: ReturnType<typeof createMockChannel>;
 	let publishToDiscordSpy: ReturnType<typeof spyOn>;
-	let getChannelIdsSpy: ReturnType<typeof spyOn>;
+	let getChannelIdSpy: ReturnType<typeof spyOn>;
 	let formatEmbedSpy: ReturnType<typeof spyOn>;
 
 	beforeEach(() => {
@@ -43,9 +39,7 @@ describe("processNotification", () => {
 		publishToDiscordSpy = spyOn(discordPublisherModule, "publishToDiscord").mockImplementation(
 			() => {},
 		);
-		getChannelIdsSpy = spyOn(channelRouterModule, "getChannelIds").mockReturnValue([
-			"111111111111111111",
-		]);
+		getChannelIdSpy = spyOn(channelRouterModule, "getChannelId").mockReturnValue("info-channel-id");
 		formatEmbedSpy = spyOn(formatterModule, "formatEmbed").mockReturnValue({
 			title: "Test",
 			color: 0x57f287,
@@ -68,19 +62,6 @@ describe("processNotification", () => {
 		expect(publishToDiscordSpy).toHaveBeenCalledTimes(1);
 	});
 
-	it("should publish to multiple channels for error routes", () => {
-		// Arrange
-		const config = createConfig();
-		const payload = { repository: "owner/repo", status: "complete" };
-		getChannelIdsSpy.mockReturnValue(["111111111111111111", "222222222222222222"]);
-
-		// Act
-		processNotification("ci.failure", payload, config, channel as never, logger);
-
-		// Assert
-		expect(publishToDiscordSpy).toHaveBeenCalledTimes(2);
-	});
-
 	it("should call formatEmbed with correct arguments", () => {
 		// Arrange
 		const config = createConfig();
@@ -93,7 +74,7 @@ describe("processNotification", () => {
 		expect(formatEmbedSpy).toHaveBeenCalledWith("ci.success", payload);
 	});
 
-	it("should call getChannelIds with correct arguments", () => {
+	it("should call getChannelId with correct arguments", () => {
 		// Arrange
 		const config = createConfig();
 		const payload = { repository: "owner/repo", status: "complete" };
@@ -102,38 +83,34 @@ describe("processNotification", () => {
 		processNotification("ci.success", payload, config, channel as never, logger);
 
 		// Assert
-		expect(getChannelIdsSpy).toHaveBeenCalledWith("ci.success", config);
+		expect(getChannelIdSpy).toHaveBeenCalledWith("ci.success", config);
 	});
 
-	it("should generate unique correlation IDs for each message", () => {
+	it("should generate unique correlation ID", () => {
 		// Arrange
 		const config = createConfig();
 		const payload = { repository: "owner/repo" };
-		getChannelIdsSpy.mockReturnValue(["111111111111111111", "222222222222222222"]);
 
 		// Act
 		processNotification("ci.success", payload, config, channel as never, logger);
 
 		// Assert
-		const firstCall = publishToDiscordSpy.mock.calls[0] as [unknown, { id: string }, unknown];
-		const secondCall = publishToDiscordSpy.mock.calls[1] as [unknown, { id: string }, unknown];
-		expect(firstCall[1].id).toMatch(/^notification-/);
-		expect(secondCall[1].id).toMatch(/^notification-/);
-		expect(firstCall[1].id).not.toBe(secondCall[1].id);
+		const call = publishToDiscordSpy.mock.calls[0] as [unknown, { id: string }, unknown];
+		expect(call[1].id).toMatch(/^notification-/);
 	});
 
 	it("should include correct channel_id in published message", () => {
 		// Arrange
 		const config = createConfig();
 		const payload = { repository: "owner/repo" };
-		getChannelIdsSpy.mockReturnValue(["444444444444444444"]);
+		getChannelIdSpy.mockReturnValue("warn-channel-id");
 
 		// Act
-		processNotification("ci.success", payload, config, channel as never, logger);
+		processNotification("warn.diskspace", payload, config, channel as never, logger);
 
 		// Assert
 		const call = publishToDiscordSpy.mock.calls[0] as [unknown, { channel_id: string }, unknown];
-		expect(call[1].channel_id).toBe("444444444444444444");
+		expect(call[1].channel_id).toBe("warn-channel-id");
 	});
 
 	it("should include embed in published message", () => {
@@ -153,5 +130,19 @@ describe("processNotification", () => {
 			unknown,
 		];
 		expect(call[1].embed).toEqual(testEmbed);
+	});
+
+	it("should route to different channels based on severity", () => {
+		// Arrange
+		const config = createConfig();
+		const payload = { volume: "/share/Downloads", used_percent: 82 };
+
+		// Act
+		getChannelIdSpy.mockReturnValue("error-channel-id");
+		processNotification("error.diskspace", payload, config, channel as never, logger);
+
+		// Assert
+		const call = publishToDiscordSpy.mock.calls[0] as [unknown, { channel_id: string }, unknown];
+		expect(call[1].channel_id).toBe("error-channel-id");
 	});
 });

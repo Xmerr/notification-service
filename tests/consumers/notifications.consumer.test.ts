@@ -12,10 +12,10 @@ function createConfig(): Config {
 	return {
 		rabbitmq: { url: "amqp://localhost" },
 		discord: {
-			channels: { default: "100000000000000000" },
-			routes: {},
-			errorRoutes: [],
-			defaultChannel: "100000000000000000",
+			infoChannel: "info-channel-id",
+			warnChannel: "warn-channel-id",
+			errorChannel: "error-channel-id",
+			criticalChannel: "critical-channel-id",
 		},
 		loki: { host: undefined },
 		logLevel: "info",
