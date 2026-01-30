@@ -5,10 +5,10 @@ export interface Config {
 		url: string;
 	};
 	discord: {
-		channels: Record<string, string>;
-		routes: Record<string, string>;
-		errorRoutes: string[];
-		defaultChannel: string;
+		infoChannel: string;
+		warnChannel: string;
+		errorChannel: string;
+		criticalChannel: string;
 	};
 	loki: {
 		host: string | undefined;
@@ -16,42 +16,20 @@ export interface Config {
 	logLevel: pino.Level;
 }
 
-function getChannelsFromEnv(): Record<string, string> {
-	const channels: Record<string, string> = {};
-	for (const [key, value] of Object.entries(process.env)) {
-		if (key.startsWith("DISCORD_CHANNEL_") && value) {
-			const name = key.replace("DISCORD_CHANNEL_", "").toLowerCase();
-			channels[name] = value;
-		}
+function requireEnv(key: string): string {
+	const value = process.env[key];
+	if (!value) {
+		throw new Error(`${key} environment variable is required`);
 	}
-	return channels;
-}
-
-function getRoutesFromEnv(): Record<string, string> {
-	const routes: Record<string, string> = {};
-	for (const [key, value] of Object.entries(process.env)) {
-		if (key.startsWith("DISCORD_ROUTE_") && value) {
-			const category = key.replace("DISCORD_ROUTE_", "").toLowerCase();
-			routes[category] = value.toLowerCase();
-		}
-	}
-	return routes;
+	return value;
 }
 
 export function loadConfig(): Config {
-	const rabbitmqUrl = process.env["RABBITMQ_URL"];
-	if (!rabbitmqUrl) {
-		throw new Error("RABBITMQ_URL environment variable is required");
-	}
-
-	const defaultChannel = process.env["DISCORD_CHANNEL_DEFAULT"];
-	if (!defaultChannel) {
-		throw new Error("DISCORD_CHANNEL_DEFAULT environment variable is required");
-	}
-
-	const errorRoutesRaw =
-		process.env["DISCORD_ERROR_ROUTES"] ?? "ci.failure,deploy.failure,dlq,polling.failure";
-	const errorRoutes = errorRoutesRaw.split(",").map((r) => r.trim());
+	const rabbitmqUrl = requireEnv("RABBITMQ_URL");
+	const infoChannel = requireEnv("DISCORD_CHANNEL_INFO");
+	const warnChannel = requireEnv("DISCORD_CHANNEL_WARN");
+	const errorChannel = requireEnv("DISCORD_CHANNEL_ERROR");
+	const criticalChannel = requireEnv("DISCORD_CHANNEL_CRITICAL");
 
 	const logLevel = (process.env["LOG_LEVEL"] ?? "info") as pino.Level;
 
@@ -60,10 +38,10 @@ export function loadConfig(): Config {
 			url: rabbitmqUrl,
 		},
 		discord: {
-			channels: getChannelsFromEnv(),
-			routes: getRoutesFromEnv(),
-			errorRoutes,
-			defaultChannel,
+			infoChannel,
+			warnChannel,
+			errorChannel,
+			criticalChannel,
 		},
 		loki: {
 			host: process.env["LOKI_HOST"],

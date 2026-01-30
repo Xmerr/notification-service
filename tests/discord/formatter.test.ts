@@ -225,6 +225,130 @@ describe("formatEmbed", () => {
 		});
 	});
 
+	describe("Disk space messages", () => {
+		it("should format warn.diskspace message", () => {
+			// Arrange
+			const payload = {
+				volume: "/share/Downloads",
+				mount_point: "/share/Downloads",
+				used_percent: 82,
+				free_bytes: 90000000000,
+				threshold: "warning",
+			};
+
+			// Act
+			const embed = formatEmbed("warn.diskspace", payload);
+
+			// Assert
+			expect(embed.title).toBe("Disk Space Warning");
+			expect(embed.color).toBe(0xfee75c);
+			expect(embed.fields).toContainEqual({
+				name: "Volume",
+				value: "/share/Downloads",
+				inline: true,
+			});
+			expect(embed.fields).toContainEqual({ name: "Usage", value: "82%", inline: true });
+		});
+
+		it("should format error.diskspace message", () => {
+			// Arrange
+			const payload = {
+				volume: "/share/Media",
+				used_percent: 91,
+				free_bytes: 45000000000,
+			};
+
+			// Act
+			const embed = formatEmbed("error.diskspace", payload);
+
+			// Assert
+			expect(embed.title).toBe("Disk Space Critical");
+			expect(embed.color).toBe(0xe67e22);
+			expect(embed.fields).toContainEqual({ name: "Volume", value: "/share/Media", inline: true });
+			expect(embed.fields).toContainEqual({ name: "Usage", value: "91%", inline: true });
+		});
+
+		it("should format critical.diskspace message", () => {
+			// Arrange
+			const payload = {
+				volume: "/share/System",
+				used_percent: 97,
+				free_bytes: 15000000000,
+			};
+
+			// Act
+			const embed = formatEmbed("critical.diskspace", payload);
+
+			// Assert
+			expect(embed.title).toBe("Disk Space Emergency");
+			expect(embed.color).toBe(0xed4245);
+			expect(embed.fields).toContainEqual({ name: "Volume", value: "/share/System", inline: true });
+			expect(embed.fields).toContainEqual({ name: "Usage", value: "97%", inline: true });
+		});
+
+		it("should format info.diskspace recovery message", () => {
+			// Arrange
+			const payload = {
+				volume: "/share/Downloads",
+				used_percent: 75,
+				previous_threshold: "warning",
+			};
+
+			// Act
+			const embed = formatEmbed("info.diskspace", payload);
+
+			// Assert
+			expect(embed.title).toBe("Disk Space Recovery");
+			expect(embed.color).toBe(0x57f287);
+			expect(embed.fields).toContainEqual({
+				name: "Recovered From",
+				value: "warning",
+				inline: true,
+			});
+		});
+
+		it("should format info.diskspace status report", () => {
+			// Arrange
+			const payload = {
+				volumes: [
+					{
+						volume: "/share/Downloads",
+						mount_point: "/share/Downloads",
+						used_percent: 45,
+						status: "ok",
+					},
+					{
+						volume: "/share/Media",
+						mount_point: "/share/Media",
+						used_percent: 82,
+						status: "warning",
+					},
+				],
+			};
+
+			// Act
+			const embed = formatEmbed("info.diskspace", payload);
+
+			// Assert
+			expect(embed.title).toBe("Disk Space Status");
+			expect(embed.color).toBe(0x3498db);
+			expect(embed.description).toContain("/share/Downloads: 45% (ok)");
+			expect(embed.description).toContain("/share/Media: 82% (warning)");
+		});
+
+		it("should handle missing fields gracefully for disk space", () => {
+			// Arrange
+			const payload = {};
+
+			// Act
+			const embed = formatEmbed("warn.diskspace", payload);
+
+			// Assert
+			expect(embed.fields).toContainEqual({ name: "Volume", value: "unknown", inline: true });
+			expect(embed.fields).toContainEqual({ name: "Usage", value: "0%", inline: true });
+		});
+	});
+
 	describe("Unknown messages", () => {
 		it("should format unknown message type with JSON", () => {
 			// Arrange

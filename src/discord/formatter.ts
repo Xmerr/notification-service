@@ -191,6 +191,116 @@ export function formatEmbed(routingKey: string, payload: NotificationMessage): D
 		};
 	}
 
+	if (routingKey === "warn.diskspace") {
+		const msg = payload as {
+			volume?: string;
+			mount_point?: string;
+			used_percent?: number;
+			threshold?: string;
+			total_bytes?: number;
+			used_bytes?: number;
+			free_bytes?: number;
+		};
+		return {
+			title: "Disk Space Warning",
+			color: COLORS.yellow,
+			fields: [
+				{ name: "Volume", value: msg.volume ?? "unknown", inline: true },
+				{ name: "Usage", value: `${msg.used_percent ?? 0}%`, inline: true },
+				{ name: "Free", value: formatBytes(msg.free_bytes ?? 0), inline: true },
+			],
+		};
+	}
+
+	if (routingKey === "error.diskspace") {
+		const msg = payload as {
+			volume?: string;
+			mount_point?: string;
+			used_percent?: number;
+			threshold?: string;
+			total_bytes?: number;
+			used_bytes?: number;
+			free_bytes?: number;
+		};
+		return {
+			title: "Disk Space Critical",
+			color: COLORS.orange,
+			fields: [
+				{ name: "Volume", value: msg.volume ?? "unknown", inline: true },
+				{ name: "Usage", value: `${msg.used_percent ?? 0}%`, inline: true },
+				{ name: "Free", value: formatBytes(msg.free_bytes ?? 0), inline: true },
+			],
+		};
+	}
+
+	if (routingKey === "critical.diskspace") {
+		const msg = payload as {
+			volume?: string;
+			mount_point?: string;
+			used_percent?: number;
+			threshold?: string;
+			total_bytes?: number;
+			used_bytes?: number;
+			free_bytes?: number;
+		};
+		return {
+			title: "Disk Space Emergency",
+			color: COLORS.red,
+			fields: [
+				{ name: "Volume", value: msg.volume ?? "unknown", inline: true },
+				{ name: "Usage", value: `${msg.used_percent ?? 0}%`, inline: true },
+				{ name: "Free", value: formatBytes(msg.free_bytes ?? 0), inline: true },
+			],
+		};
+	}
+
+	if (routingKey === "info.diskspace") {
+		const msg = payload as {
+			volume?: string;
+			mount_point?: string;
+			used_percent?: number;
+			previous_threshold?: string;
+			volumes?: Array<{
+				volume: string;
+				mount_point: string;
+				used_percent: number;
+				status: string;
+			}>;
+		};
+
+		if (msg.previous_threshold) {
+			return {
+				title: "Disk Space Recovery",
+				color: COLORS.green,
+				fields: [
+					{ name: "Volume", value: msg.volume ?? "unknown", inline: true },
+					{ name: "Usage", value: `${msg.used_percent ?? 0}%`, inline: true },
+					{ name: "Recovered From", value: msg.previous_threshold, inline: true },
+				],
+			};
+		}
+
+		if (msg.volumes && msg.volumes.length > 0) {
+			const volumeList = msg.volumes
+				.map((v) => `${v.volume}: ${v.used_percent}% (${v.status})`)
+				.join("\n");
+			return {
+				title: "Disk Space Status",
+				color: COLORS.blue,
+				description: truncate(volumeList, 1000),
+			};
+		}
+
+		return {
+			title: "Disk Space Status",
+			color: COLORS.blue,
+			fields: [
+				{ name: "Volume", value: msg.volume ?? "unknown", inline: true },
+				{ name: "Usage", value: `${msg.used_percent ?? 0}%`, inline: true },
+			],
+		};
+	}
+
 	return {
 		title: `Notification: ${routingKey}`,
 		description: truncate(JSON.stringify(payload, null, 2), 1000),
