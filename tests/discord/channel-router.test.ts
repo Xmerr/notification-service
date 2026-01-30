@@ -1,168 +1,147 @@
 import { describe, expect, it } from "bun:test";
 import type { Config } from "../../src/config/index.js";
-import { getChannelIds } from "../../src/discord/channel-router.js";
+import { getChannelId } from "../../src/discord/channel-router.js";
 
-function createConfig(overrides: Partial<Config["discord"]> = {}): Config {
-	const defaultChannels = {
-		default: "100000000000000000",
-		info: "111111111111111111",
-		errors: "222222222222222222",
-	};
-
+function createConfig(): Config {
 	return {
 		rabbitmq: { url: "amqp://localhost" },
 		discord: {
-			channels: overrides.channels ?? defaultChannels,
-			routes: {
-				ci: "info",
-				pr: "info",
-				...overrides.routes,
-			},
-			errorRoutes: overrides.errorRoutes ?? [
-				"ci.failure",
-				"deploy.failure",
-				"dlq",
-				"polling.failure",
-			],
-			defaultChannel: overrides.defaultChannel ?? "100000000000000000",
+			infoChannel: "info-channel-id",
+			warnChannel: "warn-channel-id",
+			errorChannel: "error-channel-id",
+			criticalChannel: "critical-channel-id",
 		},
 		loki: { host: undefined },
 		logLevel: "info",
 	};
 }
 
-describe("getChannelIds", () => {
-	describe("primary channel routing", () => {
-		it("should route to mapped channel when route exists", () => {
+describe("getChannelId", () => {
+	describe("severity-based routing", () => {
+		it("should route info.* to info channel", () => {
 			// Arrange
 			const config = createConfig();
 
 			// Act
-			const channelIds = getChannelIds("ci.success", config);
+			const channelId = getChannelId("info.diskspace", config);
 
 			// Assert
-			expect(channelIds).toContain("111111111111111111");
+			expect(channelId).toBe("info-channel-id");
 		});
 
-		it("should route to default channel when no route exists", () => {
+		it("should route warn.* to warn channel", () => {
 			// Arrange
 			const config = createConfig();
 
 			// Act
-			const channelIds = getChannelIds("unknown.event", config);
+			const channelId = getChannelId("warn.diskspace", config);
 
 			// Assert
-			expect(channelIds).toContain("100000000000000000");
-			expect(channelIds).toHaveLength(1);
+			expect(channelId).toBe("warn-channel-id");
 		});
 
-		it("should route to default when mapped channel does not exist", () => {
+		it("should route error.* to error channel", () => {
 			// Arrange
-			const config = createConfig({
-				routes: { ci: "nonexistent" },
-			});
+			const config = createConfig();
 
 			// Act
-			const channelIds = getChannelIds("ci.success", config);
+			const channelId = getChannelId("error.diskspace", config);
 
 			// Assert
-			expect(channelIds).toContain("100000000000000000");
+			expect(channelId).toBe("error-channel-id");
+		});
+
+		it("should route critical.* to critical channel", () => {
+			// Arrange
+			const config = createConfig();
+
+			// Act
+			const channelId = getChannelId("critical.diskspace", config);
+
+			// Assert
+			expect(channelId).toBe("critical-channel-id");
 		});
 	});
 
-	describe("error channel routing", () => {
-		it("should add errors channel for error routes", () => {
+	describe("fallback to info channel", () => {
+		it("should fallback to info for ci.* routing keys", () => {
 			// Arrange
 			const config = createConfig();
 
 			// Act
-			const channelIds = getChannelIds("ci.failure", config);
+			const channelId = getChannelId("ci.success", config);
 
 			// Assert
-			expect(channelIds).toContain("111111111111111111");
-			expect(channelIds).toContain("222222222222222222");
-			expect(channelIds).toHaveLength(2);
+			expect(channelId).toBe("info-channel-id");
 		});
 
-		it("should add errors channel for dlq routes", () => {
+		it("should fallback to info for pr.* routing keys", () => {
 			// Arrange
 			const config = createConfig();
 
 			// Act
-			const channelIds = getChannelIds("dlq.some-service", config);
+			const channelId = getChannelId("pr.opened", config);
 
 			// Assert
-			expect(channelIds).toContain("222222222222222222");
+			expect(channelId).toBe("info-channel-id");
 		});
 
-		it("should not add errors channel when not configured", () => {
-			// Arrange
-			const config = createConfig({
-				channels: {
-					default: "100000000000000000",
-					info: "111111111111111111",
-				},
-			});
-
-			// Act
-			const channelIds = getChannelIds("ci.failure", config);
-
-			// Assert
-			expect(channelIds).toHaveLength(1);
-		});
-
-		it("should not add errors channel for non-error routes", () => {
+		it("should fallback to info for unknown routing keys", () => {
 			// Arrange
 			const config = createConfig();
 
 			// Act
-			const channelIds = getChannelIds("ci.success", config);
+			const channelId = getChannelId("unknown.event", config);
 
 			// Assert
-			expect(channelIds).not.toContain("222222222222222222");
-			expect(channelIds).toHaveLength(1);
+			expect(channelId).toBe("info-channel-id");
 		});
 
-		it("should not duplicate if primary and errors are same channel", () => {
+		it("should fallback to info for empty routing key", () => {
 			// Arrange
-			const config = createConfig({
-				channels: {
-					default: "100000000000000000",
-					info: "333333333333333333",
-					errors: "333333333333333333",
-				},
-			});
+			const config = createConfig();
 
 			// Act
-			const channelIds = getChannelIds("ci.failure", config);
+			const channelId = getChannelId("", config);
 
 			// Assert
-			expect(channelIds).toHaveLength(1);
-			expect(channelIds[0]).toBe("333333333333333333");
+			expect(channelId).toBe("info-channel-id");
+		});
+	});
+
+	describe("case insensitivity", () => {
+		it("should be case-insensitive for severity prefix", () => {
+			// Arrange
+			const config = createConfig();
+
+			// Act & Assert
+			expect(getChannelId("WARN.diskspace", config)).toBe("warn-channel-id");
+			expect(getChannelId("Warn.diskspace", config)).toBe("warn-channel-id");
+			expect(getChannelId("ERROR.test", config)).toBe("error-channel-id");
 		});
 	});
 
 	describe("routing key extraction", () => {
-		it("should extract category from single-part routing key", () => {
+		it("should handle routing keys with multiple dots", () => {
 			// Arrange
-			const config = createConfig({ routes: { deploy: "info" } });
+			const config = createConfig();
 
 			// Act
-			const channelIds = getChannelIds("deploy", config);
+			const channelId = getChannelId("error.diskspace.critical", config);
 
 			// Assert
-			expect(channelIds).toContain("111111111111111111");
+			expect(channelId).toBe("error-channel-id");
 		});
 
-		it("should extract category from multi-part routing key", () => {
+		it("should handle single-part routing key", () => {
 			// Arrange
-			const config = createConfig({ routes: { notifications: "info" } });
+			const config = createConfig();
 
 			// Act
-			const channelIds = getChannelIds("notifications.dlq.some-service", config);
+			const channelId = getChannelId("warn", config);
 
 			// Assert
-			expect(channelIds).toContain("111111111111111111");
+			expect(channelId).toBe("warn-channel-id");
 		});
 	});
 });
