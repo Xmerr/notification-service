@@ -12,10 +12,10 @@ function createConfig(): Config {
 	return {
 		rabbitmq: { url: "amqp://localhost" },
 		discord: {
-			webhooks: { default: "https://discord.com/api/webhooks/default/token" },
+			channels: { default: "100000000000000000" },
 			routes: {},
 			errorRoutes: [],
-			defaultWebhook: "https://discord.com/api/webhooks/default/token",
+			defaultChannel: "100000000000000000",
 		},
 		loki: { host: undefined },
 		logLevel: "info",
@@ -31,6 +31,7 @@ function createMockChannel() {
 			return Promise.resolve();
 		}),
 		ack: mock(() => {}),
+		publish: mock(() => true),
 		getMessageHandler: () => messageHandler,
 	};
 }
@@ -51,8 +52,8 @@ describe("startConsumer", () => {
 
 	beforeEach(() => {
 		channel = createMockChannel();
-		processNotificationSpy = spyOn(serviceModule, "processNotification").mockResolvedValue(
-			undefined,
+		processNotificationSpy = spyOn(serviceModule, "processNotification").mockImplementation(
+			() => {},
 		);
 		publishToRetrySpy = spyOn(publisherModule, "publishToRetry").mockResolvedValue(undefined);
 		publishDirectToDLQSpy = spyOn(publisherModule, "publishDirectToDLQ").mockResolvedValue(
@@ -93,6 +94,7 @@ describe("startConsumer", () => {
 			"ci.success",
 			{ test: "data" },
 			config,
+			channel,
 			logger,
 		);
 		expect(channel.ack).toHaveBeenCalledWith(message);
@@ -137,7 +139,9 @@ describe("startConsumer", () => {
 	it("should retry on RetryableError", async () => {
 		// Arrange
 		const config = createConfig();
-		processNotificationSpy.mockRejectedValue(new RetryableError("Network error", "NETWORK_ERROR"));
+		processNotificationSpy.mockImplementation(() => {
+			throw new RetryableError("Network error", "NETWORK_ERROR");
+		});
 		await startConsumer(channel as never, config, logger);
 		const handler = channel.getMessageHandler()!;
 		const message = createMessage({ test: "data" }, "ci.success", { "x-retry-count": 1 });
@@ -153,7 +157,9 @@ describe("startConsumer", () => {
 	it("should send NonRetryableError directly to DLQ", async () => {
 		// Arrange
 		const config = createConfig();
-		processNotificationSpy.mockRejectedValue(new NonRetryableError("Bad request", "CLIENT_ERROR"));
+		processNotificationSpy.mockImplementation(() => {
+			throw new NonRetryableError("Bad request", "CLIENT_ERROR");
+		});
 		await startConsumer(channel as never, config, logger);
 		const handler = channel.getMessageHandler()!;
 		const message = createMessage({ test: "data" }, "ci.success");
@@ -169,7 +175,9 @@ describe("startConsumer", () => {
 	it("should treat unexpected errors as retryable", async () => {
 		// Arrange
 		const config = createConfig();
-		processNotificationSpy.mockRejectedValue(new Error("Unexpected error"));
+		processNotificationSpy.mockImplementation(() => {
+			throw new Error("Unexpected error");
+		});
 		await startConsumer(channel as never, config, logger);
 		const handler = channel.getMessageHandler()!;
 		const message = createMessage({ test: "data" }, "ci.success");
@@ -185,7 +193,9 @@ describe("startConsumer", () => {
 	it("should treat non-Error throws as retryable", async () => {
 		// Arrange
 		const config = createConfig();
-		processNotificationSpy.mockRejectedValue("string error");
+		processNotificationSpy.mockImplementation(() => {
+			throw "string error";
+		});
 		await startConsumer(channel as never, config, logger);
 		const handler = channel.getMessageHandler()!;
 		const message = createMessage({ test: "data" }, "ci.success");

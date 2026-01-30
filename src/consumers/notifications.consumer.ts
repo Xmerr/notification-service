@@ -34,7 +34,7 @@ export async function startConsumer(
 					throw new NonRetryableError("Invalid JSON in message payload", "INVALID_JSON");
 				}
 
-				await processNotification(routingKey, payload, config, logger);
+				processNotification(routingKey, payload, config, channel, logger);
 
 				channel.ack(msg);
 				logger.info({ routingKey }, "Message processed successfully");

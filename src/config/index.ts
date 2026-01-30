@@ -5,10 +5,10 @@ export interface Config {
 		url: string;
 	};
 	discord: {
-		webhooks: Record<string, string>;
+		channels: Record<string, string>;
 		routes: Record<string, string>;
 		errorRoutes: string[];
-		defaultWebhook: string;
+		defaultChannel: string;
 	};
 	loki: {
 		host: string | undefined;
@@ -16,15 +16,15 @@ export interface Config {
 	logLevel: pino.Level;
 }
 
-function getWebhooksFromEnv(): Record<string, string> {
-	const webhooks: Record<string, string> = {};
+function getChannelsFromEnv(): Record<string, string> {
+	const channels: Record<string, string> = {};
 	for (const [key, value] of Object.entries(process.env)) {
-		if (key.startsWith("DISCORD_WEBHOOK_") && value) {
-			const name = key.replace("DISCORD_WEBHOOK_", "").toLowerCase();
-			webhooks[name] = value;
+		if (key.startsWith("DISCORD_CHANNEL_") && value) {
+			const name = key.replace("DISCORD_CHANNEL_", "").toLowerCase();
+			channels[name] = value;
 		}
 	}
-	return webhooks;
+	return channels;
 }
 
 function getRoutesFromEnv(): Record<string, string> {
@@ -44,9 +44,9 @@ export function loadConfig(): Config {
 		throw new Error("RABBITMQ_URL environment variable is required");
 	}
 
-	const defaultWebhook = process.env["DISCORD_WEBHOOK_DEFAULT"];
-	if (!defaultWebhook) {
-		throw new Error("DISCORD_WEBHOOK_DEFAULT environment variable is required");
+	const defaultChannel = process.env["DISCORD_CHANNEL_DEFAULT"];
+	if (!defaultChannel) {
+		throw new Error("DISCORD_CHANNEL_DEFAULT environment variable is required");
 	}
 
 	const errorRoutesRaw =
@@ -60,10 +60,10 @@ export function loadConfig(): Config {
 			url: rabbitmqUrl,
 		},
 		discord: {
-			webhooks: getWebhooksFromEnv(),
+			channels: getChannelsFromEnv(),
 			routes: getRoutesFromEnv(),
 			errorRoutes,
-			defaultWebhook,
+			defaultChannel,
 		},
 		loki: {
 			host: process.env["LOKI_HOST"],
