@@ -1,6 +1,6 @@
 # Notification Service
 
-RabbitMQ consumer that routes messages from the `notifications` exchange to Discord channels via webhooks. Built with Bun and TypeScript.
+RabbitMQ consumer that routes messages from the `notifications` exchange to Discord channels via the `discord` exchange. Built with Bun and TypeScript.
 
 ## Links
 
@@ -9,7 +9,7 @@ RabbitMQ consumer that routes messages from the `notifications` exchange to Disc
 
 ## Features
 
-- **Flexible Routing**: Map routing key prefixes to different Discord webhooks
+- **Flexible Routing**: Map routing key prefixes to different Discord channels
 - **Error Routing**: Automatically send critical events (failures, DLQ alerts) to a dedicated errors channel
 - **Retry with Backoff**: Exponential backoff via RabbitMQ Delayed Message Exchange plugin
 - **Dead Letter Queue**: Failed messages routed to DLQ with alerting
@@ -18,6 +18,7 @@ RabbitMQ consumer that routes messages from the `notifications` exchange to Disc
 
 - Bun 1.x
 - RabbitMQ 3.12+ with [Delayed Message Exchange plugin](https://github.com/rabbitmq/rabbitmq-delayed-message-exchange)
+- Discord Bot Service (consuming from `discord` exchange)
 - Docker (for containerized deployment)
 
 ## Quick Start
@@ -45,7 +46,7 @@ docker build -t xmer/notification-service .
 docker run -d \
   --name notification-service \
   -e RABBITMQ_URL="amqp://user:pass@rabbitmq:5672" \
-  -e DISCORD_WEBHOOK_DEFAULT="https://discord.com/api/webhooks/..." \
+  -e DISCORD_CHANNEL_DEFAULT="123456789012345678" \
   xmer/notification-service
 ```
 
@@ -57,9 +58,9 @@ services:
     image: xmer/notification-service:latest
     environment:
       - RABBITMQ_URL=amqp://user:pass@rabbitmq:5672
-      - DISCORD_WEBHOOK_DEFAULT=https://discord.com/api/webhooks/.../...
-      - DISCORD_WEBHOOK_INFO=https://discord.com/api/webhooks/.../...
-      - DISCORD_WEBHOOK_ERRORS=https://discord.com/api/webhooks/.../...
+      - DISCORD_CHANNEL_DEFAULT=123456789012345678
+      - DISCORD_CHANNEL_INFO=234567890123456789
+      - DISCORD_CHANNEL_ERRORS=345678901234567890
       - DISCORD_ROUTE_CI=info
       - DISCORD_ROUTE_PR=info
       - DISCORD_ERROR_ROUTES=ci.failure,deploy.failure,dlq,polling.failure
@@ -73,38 +74,38 @@ services:
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `RABBITMQ_URL` | AMQP connection URI | `amqp://user:pass@192.168.0.100:5672` |
-| `DISCORD_WEBHOOK_DEFAULT` | Fallback webhook for unrouted messages | `https://discord.com/api/webhooks/.../...` |
+| `DISCORD_CHANNEL_DEFAULT` | Fallback channel ID for unrouted messages | `123456789012345678` |
 
-### Optional Webhooks
+### Optional Channels
 
-Define named webhooks using the `DISCORD_WEBHOOK_<NAME>` pattern:
+Define named channels using the `DISCORD_CHANNEL_<NAME>` pattern:
 
 | Variable | Description |
 |----------|-------------|
-| `DISCORD_WEBHOOK_INFO` | Webhook for informational messages (CI, deploys) |
-| `DISCORD_WEBHOOK_PRS` | Webhook for pull request notifications |
-| `DISCORD_WEBHOOK_MEDIA` | Webhook for download/media notifications |
-| `DISCORD_WEBHOOK_ALERTS` | Webhook for alerts and warnings |
-| `DISCORD_WEBHOOK_ERRORS` | Webhook for critical errors (receives duplicates of error routes) |
+| `DISCORD_CHANNEL_INFO` | Channel for informational messages (CI, deploys) |
+| `DISCORD_CHANNEL_PRS` | Channel for pull request notifications |
+| `DISCORD_CHANNEL_MEDIA` | Channel for download/media notifications |
+| `DISCORD_CHANNEL_ALERTS` | Channel for alerts and warnings |
+| `DISCORD_CHANNEL_ERRORS` | Channel for critical errors (receives duplicates of error routes) |
 
 ### Optional Routes
 
-Map routing key prefixes to webhook names using `DISCORD_ROUTE_<CATEGORY>`:
+Map routing key prefixes to channel names using `DISCORD_ROUTE_<CATEGORY>`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DISCORD_ROUTE_CI` | (none) | Route `ci.*` messages to specified webhook |
-| `DISCORD_ROUTE_PR` | (none) | Route `pr.*` messages to specified webhook |
-| `DISCORD_ROUTE_DOWNLOADS` | (none) | Route `downloads.*` messages to specified webhook |
-| `DISCORD_ROUTE_DEPLOY` | (none) | Route `deploy.*` messages to specified webhook |
-| `DISCORD_ROUTE_POLLING` | (none) | Route `polling.*` messages to specified webhook |
-| `DISCORD_ROUTE_DLQ` | (none) | Route `dlq.*` messages to specified webhook |
+| `DISCORD_ROUTE_CI` | (none) | Route `ci.*` messages to specified channel |
+| `DISCORD_ROUTE_PR` | (none) | Route `pr.*` messages to specified channel |
+| `DISCORD_ROUTE_DOWNLOADS` | (none) | Route `downloads.*` messages to specified channel |
+| `DISCORD_ROUTE_DEPLOY` | (none) | Route `deploy.*` messages to specified channel |
+| `DISCORD_ROUTE_POLLING` | (none) | Route `polling.*` messages to specified channel |
+| `DISCORD_ROUTE_DLQ` | (none) | Route `dlq.*` messages to specified channel |
 
 ### Error Routes
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DISCORD_ERROR_ROUTES` | `ci.failure,deploy.failure,dlq,polling.failure` | Comma-separated routing key prefixes that also send to the errors webhook |
+| `DISCORD_ERROR_ROUTES` | `ci.failure,deploy.failure,dlq,polling.failure` | Comma-separated routing key prefixes that also send to the errors channel |
 
 ### Infrastructure
 
@@ -137,9 +138,27 @@ The service formats different message types into Discord embeds:
 RabbitMQ (notifications queue)
   → NotificationConsumer
     → NotificationService (orchestrator)
-      → Router (routing key → webhook URLs)
+      → ChannelRouter (routing key → channel IDs)
       → Formatter (payload → Discord embed)
-      → Client (HTTP POST to Discord)
+      → DiscordPublisher (publish to discord exchange)
+        → discord-bot service
+          → Discord API
+```
+
+### Message Contract
+
+Published to `discord` exchange with routing key `post.send`:
+
+```json
+{
+  "id": "notification-<uuid>",
+  "channel_id": "123456789012345678",
+  "embed": {
+    "title": "CI Build Succeeded",
+    "color": 5747335,
+    "fields": [...]
+  }
+}
 ```
 
 ### DLQ Strategy

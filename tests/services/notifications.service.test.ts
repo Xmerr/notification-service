@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import pino from "pino";
 import type { Config } from "../../src/config/index.js";
-import { RetryableError } from "../../src/errors/index.js";
+import * as channelRouterModule from "../../src/discord/channel-router.js";
+import * as formatterModule from "../../src/discord/formatter.js";
+import * as discordPublisherModule from "../../src/publishers/discord.publisher.js";
 import { processNotification } from "../../src/services/notifications.service.js";
 
 const logger = pino({ level: "silent" });
@@ -10,84 +12,146 @@ function createConfig(): Config {
 	return {
 		rabbitmq: { url: "amqp://localhost" },
 		discord: {
-			webhooks: {
-				default: "https://discord.com/api/webhooks/default/token",
-				info: "https://discord.com/api/webhooks/info/token",
-				errors: "https://discord.com/api/webhooks/errors/token",
+			channels: {
+				default: "100000000000000000",
+				info: "111111111111111111",
+				errors: "222222222222222222",
 			},
 			routes: { ci: "info" },
 			errorRoutes: ["ci.failure"],
-			defaultWebhook: "https://discord.com/api/webhooks/default/token",
+			defaultChannel: "100000000000000000",
 		},
 		loki: { host: undefined },
 		logLevel: "info",
 	};
 }
 
+function createMockChannel() {
+	return {
+		publish: mock(() => true),
+	};
+}
+
 describe("processNotification", () => {
-	let fetchMock: ReturnType<typeof mock>;
+	let channel: ReturnType<typeof createMockChannel>;
+	let publishToDiscordSpy: ReturnType<typeof spyOn>;
+	let getChannelIdsSpy: ReturnType<typeof spyOn>;
+	let formatEmbedSpy: ReturnType<typeof spyOn>;
 
 	beforeEach(() => {
-		fetchMock = mock(() => Promise.resolve(new Response(null, { status: 200 })));
-		spyOn(globalThis, "fetch").mockImplementation(fetchMock as unknown as typeof fetch);
+		channel = createMockChannel();
+		publishToDiscordSpy = spyOn(discordPublisherModule, "publishToDiscord").mockImplementation(
+			() => {},
+		);
+		getChannelIdsSpy = spyOn(channelRouterModule, "getChannelIds").mockReturnValue([
+			"111111111111111111",
+		]);
+		formatEmbedSpy = spyOn(formatterModule, "formatEmbed").mockReturnValue({
+			title: "Test",
+			color: 0x57f287,
+		});
 	});
 
 	afterEach(() => {
 		mock.restore();
 	});
 
-	it("should process notification and send to webhook", async () => {
+	it("should process notification and publish to discord", () => {
 		// Arrange
 		const config = createConfig();
 		const payload = { repository: "owner/repo", status: "complete" };
 
 		// Act
-		await processNotification("ci.success", payload, config, logger);
+		processNotification("ci.success", payload, config, channel as never, logger);
 
 		// Assert
-		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(publishToDiscordSpy).toHaveBeenCalledTimes(1);
 	});
 
-	it("should send to multiple webhooks for error routes", async () => {
+	it("should publish to multiple channels for error routes", () => {
+		// Arrange
+		const config = createConfig();
+		const payload = { repository: "owner/repo", status: "complete" };
+		getChannelIdsSpy.mockReturnValue(["111111111111111111", "222222222222222222"]);
+
+		// Act
+		processNotification("ci.failure", payload, config, channel as never, logger);
+
+		// Assert
+		expect(publishToDiscordSpy).toHaveBeenCalledTimes(2);
+	});
+
+	it("should call formatEmbed with correct arguments", () => {
 		// Arrange
 		const config = createConfig();
 		const payload = { repository: "owner/repo", status: "complete" };
 
 		// Act
-		await processNotification("ci.failure", payload, config, logger);
+		processNotification("ci.success", payload, config, channel as never, logger);
 
 		// Assert
-		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(formatEmbedSpy).toHaveBeenCalledWith("ci.success", payload);
 	});
 
-	it("should throw error if any webhook fails", async () => {
+	it("should call getChannelIds with correct arguments", () => {
 		// Arrange
 		const config = createConfig();
-		fetchMock.mockRejectedValue(new RetryableError("Network error", "NETWORK_ERROR"));
+		const payload = { repository: "owner/repo", status: "complete" };
+
+		// Act
+		processNotification("ci.success", payload, config, channel as never, logger);
+
+		// Assert
+		expect(getChannelIdsSpy).toHaveBeenCalledWith("ci.success", config);
+	});
+
+	it("should generate unique correlation IDs for each message", () => {
+		// Arrange
+		const config = createConfig();
 		const payload = { repository: "owner/repo" };
-
-		// Act & Assert
-		await expect(processNotification("ci.success", payload, config, logger)).rejects.toBeInstanceOf(
-			RetryableError,
-		);
-	});
-
-	it("should format payload into Discord embed", async () => {
-		// Arrange
-		const config = createConfig();
-		const payload = {
-			repository: "owner/repo",
-			status: "complete",
-			run_url: "https://github.com/owner/repo/actions/runs/123",
-		};
+		getChannelIdsSpy.mockReturnValue(["111111111111111111", "222222222222222222"]);
 
 		// Act
-		await processNotification("ci.success", payload, config, logger);
+		processNotification("ci.success", payload, config, channel as never, logger);
 
 		// Assert
-		const call = fetchMock.mock.calls[0] as [string, RequestInit];
-		const body = JSON.parse(call[1].body as string);
-		expect(body.embeds[0].title).toBe("CI Build Succeeded");
-		expect(body.embeds[0].color).toBe(0x57f287);
+		const firstCall = publishToDiscordSpy.mock.calls[0] as [unknown, { id: string }, unknown];
+		const secondCall = publishToDiscordSpy.mock.calls[1] as [unknown, { id: string }, unknown];
+		expect(firstCall[1].id).toMatch(/^notification-/);
+		expect(secondCall[1].id).toMatch(/^notification-/);
+		expect(firstCall[1].id).not.toBe(secondCall[1].id);
+	});
+
+	it("should include correct channel_id in published message", () => {
+		// Arrange
+		const config = createConfig();
+		const payload = { repository: "owner/repo" };
+		getChannelIdsSpy.mockReturnValue(["444444444444444444"]);
+
+		// Act
+		processNotification("ci.success", payload, config, channel as never, logger);
+
+		// Assert
+		const call = publishToDiscordSpy.mock.calls[0] as [unknown, { channel_id: string }, unknown];
+		expect(call[1].channel_id).toBe("444444444444444444");
+	});
+
+	it("should include embed in published message", () => {
+		// Arrange
+		const config = createConfig();
+		const payload = { repository: "owner/repo" };
+		const testEmbed = { title: "CI Build Succeeded", color: 0x57f287 };
+		formatEmbedSpy.mockReturnValue(testEmbed);
+
+		// Act
+		processNotification("ci.success", payload, config, channel as never, logger);
+
+		// Assert
+		const call = publishToDiscordSpy.mock.calls[0] as [
+			unknown,
+			{ embed: { title: string; color: number } },
+			unknown,
+		];
+		expect(call[1].embed).toEqual(testEmbed);
 	});
 });

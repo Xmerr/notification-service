@@ -13,8 +13,11 @@ export interface DiscordEmbedField {
 	inline?: boolean;
 }
 
-export interface DiscordWebhookPayload {
-	embeds: DiscordEmbed[];
+export interface SendPostMessage {
+	id: string;
+	channel_id: string;
+	content?: string;
+	embed?: DiscordEmbed;
 }
 
 export interface CIMessage {
