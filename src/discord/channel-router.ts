@@ -1,7 +1,13 @@
 import type { Config } from "../config/index.js";
 
 export function getChannelId(routingKey: string, config: Config): string {
-	const severity = routingKey.split(".")[0]?.toLowerCase() ?? "";
+	const segments = routingKey.split(".");
+	const severity = segments[0]?.toLowerCase() ?? "";
+
+	// DLQ alerts use routing key: notifications.dlq.{service-name}
+	if (segments[1] === "dlq") {
+		return config.discord.errorChannel;
+	}
 
 	switch (severity) {
 		case "info":
