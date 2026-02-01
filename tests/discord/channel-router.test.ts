@@ -144,4 +144,28 @@ describe("getChannelId", () => {
 			expect(channelId).toBe("warn-channel-id");
 		});
 	});
+
+	describe("DLQ routing", () => {
+		it("should route notifications.dlq.* to error channel", () => {
+			// Arrange
+			const config = createConfig();
+
+			// Act
+			const channelId = getChannelId("notifications.dlq.qbittorrent", config);
+
+			// Assert
+			expect(channelId).toBe("error-channel-id");
+		});
+
+		it("should route any *.dlq.* pattern to error channel", () => {
+			// Arrange
+			const config = createConfig();
+
+			// Act
+			const channelId = getChannelId("service.dlq.consumer-name", config);
+
+			// Assert
+			expect(channelId).toBe("error-channel-id");
+		});
+	});
 });
