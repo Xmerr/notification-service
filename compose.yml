@@ -2,7 +2,7 @@ services:
   notification-service:
     build: .
     environment:
-      - RABBITMQ_URL=amqp://user:password@192.168.0.100:5672
+      - RABBITMQ_URL=${RABBITMQ_URL}
       - DISCORD_WEBHOOK_DEFAULT=${DISCORD_WEBHOOK_DEFAULT}
       - DISCORD_WEBHOOK_INFO=${DISCORD_WEBHOOK_INFO:-}
       - DISCORD_WEBHOOK_PRS=${DISCORD_WEBHOOK_PRS:-}

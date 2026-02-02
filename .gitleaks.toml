@@ -1,0 +1,37 @@
+[allowlist]
+description = "Project-specific allowlist for false positives"
+
+# Placeholder Discord channel IDs in docs
+fingerprints = [
+  "99219519ea8e8518149e2eafafbeaf3600cc3842:README.md:discord-client-id:49",
+  "99219519ea8e8518149e2eafafbeaf3600cc3842:README.md:discord-client-id:61",
+  "99219519ea8e8518149e2eafafbeaf3600cc3842:README.md:discord-client-id:62",
+  "99219519ea8e8518149e2eafafbeaf3600cc3842:README.md:discord-client-id:63",
+  # Test webhook URLs in test files (fake URLs)
+  "b77586b49d79b8ee95b2c9b895b03f1a20217de4:tests/discord/client.test.ts:discord-webhook-url:29",
+  "b77586b49d79b8ee95b2c9b895b03f1a20217de4:tests/discord/client.test.ts:discord-webhook-url:47",
+  "b77586b49d79b8ee95b2c9b895b03f1a20217de4:tests/discord/client.test.ts:discord-webhook-url:68",
+  "b77586b49d79b8ee95b2c9b895b03f1a20217de4:tests/discord/client.test.ts:discord-webhook-url:82",
+  "b77586b49d79b8ee95b2c9b895b03f1a20217de4:tests/discord/client.test.ts:discord-webhook-url:99",
+  "b77586b49d79b8ee95b2c9b895b03f1a20217de4:tests/discord/client.test.ts:discord-webhook-url:111",
+  "b77586b49d79b8ee95b2c9b895b03f1a20217de4:tests/discord/client.test.ts:discord-webhook-url:122",
+  "b77586b49d79b8ee95b2c9b895b03f1a20217de4:tests/discord/client.test.ts:discord-webhook-url:138",
+  "b77586b49d79b8ee95b2c9b895b03f1a20217de4:tests/discord/client.test.ts:discord-webhook-url:152",
+  "b77586b49d79b8ee95b2c9b895b03f1a20217de4:tests/discord/client.test.ts:discord-webhook-url:167",
+  # Placeholder AMQP URLs in docs (user:pass@host patterns)
+  "20ae43b927e6adb6d505a956fc49a4849d137cbb:README.md:amqp-connection-string:43",
+  "20ae43b927e6adb6d505a956fc49a4849d137cbb:README.md:amqp-connection-string:55",
+  "20ae43b927e6adb6d505a956fc49a4849d137cbb:README.md:amqp-connection-string:71",
+]
+
+# Allowlist test file patterns
+[[rules]]
+id = "test-file-allowlist"
+description = "Allow test files with fake secrets"
+path = '''tests/.*\.test\.ts$'''
+
+# Allowlist placeholder patterns in docs
+[[rules]]
+id = "docs-placeholder-allowlist"
+description = "Allow placeholder patterns in documentation"
+path = '''README\.md$'''
