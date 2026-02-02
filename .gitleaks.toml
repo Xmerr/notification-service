@@ -24,14 +24,8 @@ fingerprints = [
   "20ae43b927e6adb6d505a956fc49a4849d137cbb:README.md:amqp-connection-string:71",
 ]
 
-# Allowlist test file patterns
-[[rules]]
-id = "test-file-allowlist"
-description = "Allow test files with fake secrets"
-path = '''tests/.*\.test\.ts$'''
-
-# Allowlist placeholder patterns in docs
-[[rules]]
-id = "docs-placeholder-allowlist"
-description = "Allow placeholder patterns in documentation"
-path = '''README\.md$'''
+# Allowlist paths for test files and docs with placeholder values
+paths = [
+  '''tests/.*\.test\.ts$''',
+  '''\.env\.example$''',
+]
